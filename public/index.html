@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Room Management</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const socket = io();
+            let currentRoom = null;
+
+            function showInitialOptions() {
+                document.getElementById('initialOptions').style.display = 'block';
+                document.getElementById('roomOptions').style.display = 'none';
+            }
+
+            function showRoomOptions() {
+                document.getElementById('initialOptions').style.display = 'none';
+                document.getElementById('roomOptions').style.display = 'block';
+                document.getElementById('scoreRoomName').value = currentRoom;
+            }
+
+            function requestRoomList() {
+                console.log('Requesting room list');
+                socket.emit('requestRoomList');
+            }
+
+            function createRoom() {
+                const roomName = document.getElementById('roomName').value;
+                socket.emit('createRoom', roomName);
+            }
+
+            function joinRoom(roomName) {
+                socket.emit('joinRoom', roomName);
+            }
+
+            function updateScore() {
+                const playerName = document.getElementById('playerName').value;
+                const score = parseInt(document.getElementById('score').value, 10);
+                socket.emit('updateScore', currentRoom, playerName, score);
+            }
+
+            function deleteRoom(roomName) {
+                socket.emit('deleteRoom', roomName);
+            }
+
+            function updatePlayerList(players) {
+                console.log('Received player list:', players);
+                const playerList = document.getElementById('playerList');
+                playerList.innerHTML = '';
+                for (const [name, score] of Object.entries(players)) {
+                    const li = document.createElement('li');
+                    li.textContent = `${name}: ${score}`;
+                    playerList.appendChild(li);
+                }
+            }
+
+            function initEventListeners() {
+                document.getElementById('createRoomButton').addEventListener('click', createRoom);
+                document.getElementById('updateScoreButton').addEventListener('click', updateScore);
+            }
+
+            function initSocketEvents() {
+                socket.on('updateRooms', (rooms) => {
+                    console.log('Received room list:', rooms);
+                    const roomList = document.getElementById('roomList');
+                    roomList.innerHTML = '';
+                    if (rooms.length === 0) {
+                        roomList.innerHTML = '<li>No rooms available</li>';
+                    } else {
+                        rooms.forEach(room => {
+                            const li = document.createElement('li');
+                            li.textContent = room;
+
+                            const joinButton = document.createElement('button');
+                            joinButton.textContent = 'Join';
+                            joinButton.onclick = () => joinRoom(room);
+
+                            const deleteButton = document.createElement('button');
+                            deleteButton.textContent = 'Delete';
+                            deleteButton.onclick = () => deleteRoom(room);
+
+                            li.appendChild(joinButton);
+                            li.appendChild(deleteButton);
+                            roomList.appendChild(li);
+                        });
+                    }
+                });
+
+                socket.on('updatePlayers', (players) => {
+                    updatePlayerList(players);
+                });
+
+                socket.on('roomCreated', (roomName) => {
+                    alert(`Room "${roomName}" was successfully created.`);
+                    currentRoom = roomName;
+                    showRoomOptions();
+                    joinRoom(currentRoom)
+                });
+
+                socket.on('roomJoined', (roomName) => {
+                    alert(`Joined room "${roomName}".`);
+                    currentRoom = roomName;
+                    showRoomOptions();
+                });
+
+                socket.on('roomExists', (roomName) => {
+                    alert(`The room "${roomName}" already exists.`);
+                });
+
+                socket.on('roomDeleted', (roomName) => {
+                    alert(`Room "${roomName}" has been deleted.`);
+                    if (currentRoom === roomName) {
+                        currentRoom = null;
+                        showInitialOptions();
+                        requestRoomList(); // Refresh the room list
+                    }
+                });
+
+                socket.on('roomNotFound', (roomName) => {
+                    alert(`Room "${roomName}" does not exist.`);
+                });
+            }
+
+            function init() {
+                showInitialOptions();
+                initEventListeners();
+                initSocketEvents();
+                requestRoomList();
+            }
+
+            init();
+        });
+    </script>
+</head>
+
+<body>
+    <h1>Socket.IO Room Management</h1>
+    <div id="initialOptions">
+        <h2>Create Room</h2>
+        <input type="text" id="roomName" placeholder="Room Name">
+        <button id="createRoomButton">Create Room</button>
+
+        <h2>Available Rooms</h2>
+        <div id="joinRoomSection">
+            <h3>Room List</h3>
+            <ul id="roomList"></ul>
+        </div>
+    </div>
+
+    <div id="roomOptions" style="display:none;">
+        <h2>Update Score</h2>
+        <input type="text" id="scoreRoomName" placeholder="Room Name" disabled>
+        <input type="text" id="playerName" placeholder="Player Name">
+        <input type="number" id="score" placeholder="Score">
+        <button id="updateScoreButton">Update Score</button>
+
+        <h2>Players in Room</h2>
+        <ul id="playerList"></ul>
+    </div>
+</body>
+
+</html>
